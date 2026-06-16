@@ -92,7 +92,6 @@ window.a11yAnnounce = (function () {
         label: "conditions",
       },
     ];
-
     console.log(`🟦 Configured lists: ${lists.length}`);
     lists.forEach(observeListChanges);
   });
