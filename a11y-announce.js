@@ -1,4 +1,4 @@
-// a11y: shared announcement utility for screen reader announcements
+// A11y: shared announcement utility for screen reader announcements
 window.a11yAnnounce = (function () {
   let region = null;
 
@@ -22,63 +22,48 @@ window.a11yAnnounce = (function () {
   };
 })();
 
-// Shared announcement utility
-window.a11yAnnounce = (function () {
-  let region = null;
+// A11y: CMS list change observer — announces dynamic loading/filtering of CMS items
+(function () {
+  function observeListChanges(config) {
+    const { listSelector, itemSelector, label } = config;
+    const list = document.querySelector(listSelector);
+    if (!list) return; // Silently bail on pages without this list
 
-  function ensureRegion() {
-    if (region) return region;
-    region = document.createElement("div");
-    region.id = "a11y-live-region";
-    region.className = "visuallyhidden";
-    region.setAttribute("aria-live", "polite");
-    region.setAttribute("aria-atomic", "true");
-    document.body.appendChild(region);
-    console.log("🟦 a11yAnnounce: live region created");
-    return region;
+    let lastAnnouncedCount = list.querySelectorAll(itemSelector).length;
+    let debounceTimer = null;
+
+    new MutationObserver(() => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const newCount = list.querySelectorAll(itemSelector).length;
+        if (newCount !== lastAnnouncedCount) {
+          const added = newCount - lastAnnouncedCount;
+          const message =
+            added > 0
+              ? `Loaded ${added} more items. Now showing ${newCount} ${label}.`
+              : `Now showing ${newCount} ${label}.`;
+          if (window.a11yAnnounce) window.a11yAnnounce(message);
+          lastAnnouncedCount = newCount;
+        }
+      }, 500);
+    }).observe(list, { childList: true, subtree: true });
   }
 
-  return function announce(message) {
-    const el = ensureRegion();
-    el.textContent = "";
-    setTimeout(() => {
-      el.textContent = message;
-      console.log("🟢 a11yAnnounce:", message);
-    }, 50);
-  };
-})();
+  document.addEventListener("DOMContentLoaded", () => {
+    // Add new lists here as you discover them
+    const lists = [
+      {
+        listSelector: ".faq_component",
+        itemSelector: ".faq_accordion",
+        label: "FAQs",
+      },
+      {
+        listSelector: ".conditions_list",
+        itemSelector: ".w-dyn-item",
+        label: "conditions",
+      },
+    ];
 
-// FAQ list observer
-document.addEventListener("DOMContentLoaded", () => {
-  const list = document.querySelector(".faq_component");
-  if (!list) {
-    console.warn("🟦 FAQ list not found — selector wrong?");
-    return;
-  }
-
-  let lastAnnouncedCount = list.querySelectorAll(".faq_accordion").length;
-  let debounceTimer = null;
-  console.log(`🟦 FAQ observer: initial count = ${lastAnnouncedCount}`);
-
-  const observer = new MutationObserver(() => {
-    // Clear any pending announcement
-    clearTimeout(debounceTimer);
-
-    // Wait 500ms for mutations to settle, then announce the final count
-    debounceTimer = setTimeout(() => {
-      const newCount = list.querySelectorAll(".faq_accordion").length;
-      if (newCount !== lastAnnouncedCount) {
-        const added = newCount - lastAnnouncedCount;
-        const message =
-          added > 0
-            ? `Loaded ${added} more items. Now showing ${newCount} FAQs.`
-            : `Now showing ${newCount} FAQs.`;
-        window.a11yAnnounce(message);
-        lastAnnouncedCount = newCount;
-      }
-    }, 500);
+    lists.forEach(observeListChanges);
   });
-
-  observer.observe(list, { childList: true, subtree: true });
-  console.log("🟦 FAQ observer attached to:", list);
-});
+})();
