@@ -10,6 +10,7 @@ window.a11yAnnounce = (function () {
     region.setAttribute("aria-live", "polite");
     region.setAttribute("aria-atomic", "true");
     document.body.appendChild(region);
+    console.log("🟦 a11yAnnounce: live region created");
     return region;
   }
 
@@ -18,19 +19,29 @@ window.a11yAnnounce = (function () {
     el.textContent = "";
     setTimeout(() => {
       el.textContent = message;
+      console.log("🟢 a11yAnnounce:", message);
     }, 50);
   };
 })();
 
-// A11y: CMS list change observer — announces dynamic loading/filtering of CMS items
+// A11y: CMS list change observer
 (function () {
+  console.log("🟦 List observer script: loaded");
+
   function observeListChanges(config) {
     const { listSelector, itemSelector, label } = config;
     const list = document.querySelector(listSelector);
-    if (!list) return; // Silently bail on pages without this list
+
+    if (!list) {
+      console.log(`🟦 List not found on this page: ${listSelector}`);
+      return;
+    }
 
     let lastAnnouncedCount = list.querySelectorAll(itemSelector).length;
     let debounceTimer = null;
+    console.log(
+      `🟦 Observer attached: ${listSelector} (initial count: ${lastAnnouncedCount}, label: "${label}")`,
+    );
 
     new MutationObserver(() => {
       clearTimeout(debounceTimer);
@@ -42,7 +53,14 @@ window.a11yAnnounce = (function () {
             added > 0
               ? `Loaded ${added} more items. Now showing ${newCount} ${label}.`
               : `Now showing ${newCount} ${label}.`;
-          if (window.a11yAnnounce) window.a11yAnnounce(message);
+          console.log(
+            `🟦 Count changed for ${listSelector}: ${lastAnnouncedCount} → ${newCount}`,
+          );
+          if (window.a11yAnnounce) {
+            window.a11yAnnounce(message);
+          } else {
+            console.warn("🟦 a11yAnnounce not available!");
+          }
           lastAnnouncedCount = newCount;
         }
       }, 500);
@@ -50,7 +68,8 @@ window.a11yAnnounce = (function () {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    // Add new lists here as you discover them
+    console.log("🟦 DOMContentLoaded — running list observers");
+
     const lists = [
       {
         listSelector: ".faq_component",
@@ -64,6 +83,7 @@ window.a11yAnnounce = (function () {
       },
     ];
 
+    console.log(`🟦 Configured lists: ${lists.length}`);
     lists.forEach(observeListChanges);
   });
 })();
