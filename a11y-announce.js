@@ -77,6 +77,16 @@ window.a11yAnnounce = (function () {
         label: "FAQs",
       },
       {
+        listSelector: ".case-studies-other_list",
+        itemSelector: ".articles_item",
+        label: "Blog articles",
+      },
+      {
+        listSelector: ".research_list",
+        itemSelector: ".research_item",
+        label: "Research articles",
+      },
+      {
         listSelector: ".conditions_list",
         itemSelector: ".w-dyn-item",
         label: "conditions",
