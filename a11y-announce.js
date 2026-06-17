@@ -91,6 +91,11 @@ window.a11yAnnounce = (function () {
         itemSelector: ".w-dyn-item",
         label: "conditions",
       },
+      {
+        listSelector: ".media_list",
+        itemSelector: ".media_item",
+        label: "Media",
+      },
     ];
     console.log(`🟦 Configured lists: ${lists.length}`);
     lists.forEach(observeListChanges);
