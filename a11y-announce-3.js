@@ -1,5 +1,9 @@
 // A11y: shared announcement utility for screen reader announcements
-const A11Y_DEBUG = false; // flip to true for diagnostic logs
+const A11Y_DEBUG = false;
+
+function a11yLog(...args) {
+  if (A11Y_DEBUG) console.log(...args);
+}
 
 window.a11yAnnounce = (function () {
   let region = null;
@@ -12,7 +16,7 @@ window.a11yAnnounce = (function () {
     region.setAttribute("aria-live", "polite");
     region.setAttribute("aria-atomic", "true");
     document.body.appendChild(region);
-    if (A11Y_DEBUG) console.log("🟦 a11yAnnounce: live region created");
+    a11yLog("🟦 a11yAnnounce: live region created");
     return region;
   }
 
@@ -21,27 +25,29 @@ window.a11yAnnounce = (function () {
     el.textContent = "";
     setTimeout(() => {
       el.textContent = message;
-      if (A11Y_DEBUG) console.log("🟢 a11yAnnounce:", message);
+      a11yLog("🟢 a11yAnnounce:", message);
     }, 50);
   };
 })();
 
-// A11y: CMS list change observer — announces + focuses new items
+// A11y: CMS list change observer — announces + manages focus on dynamic load
 (function () {
-  if (A11Y_DEBUG) console.log("🟦 List observer script: loaded");
+  a11yLog("🟦 List observer script: loaded");
 
   function observeListChanges(config) {
-    const { listSelector, itemSelector, label } = config;
+    const { listSelector, itemSelector, label, focusTarget } = config;
     const list = document.querySelector(listSelector);
 
-    if (!list) return;
+    if (!list) {
+      a11yLog(`🟦 List not found on this page: ${listSelector}`);
+      return;
+    }
 
     let lastItems = Array.from(list.querySelectorAll(itemSelector));
     let debounceTimer = null;
-    if (A11Y_DEBUG)
-      console.log(
-        `🟦 Observer attached: ${listSelector} (initial count: ${lastItems.length}, label: "${label}")`,
-      );
+    a11yLog(
+      `🟦 Observer attached: ${listSelector} (initial count: ${lastItems.length}, label: "${label}")`,
+    );
 
     new MutationObserver(() => {
       clearTimeout(debounceTimer);
@@ -58,22 +64,36 @@ window.a11yAnnounce = (function () {
             ? `Loaded ${added} more items. Now showing ${newCount} ${label}.`
             : `Now showing ${newCount} ${label}.`;
 
-        if (A11Y_DEBUG)
-          console.log(`🟦 Count changed: ${oldCount} → ${newCount}`);
-        if (window.a11yAnnounce) window.a11yAnnounce(message);
+        a11yLog(
+          `🟦 Count changed for ${listSelector}: ${oldCount} → ${newCount}`,
+        );
 
-        // Focus management: if items were added, move focus to the first new item
+        if (window.a11yAnnounce) {
+          window.a11yAnnounce(message);
+        }
+
+        // Focus management: move focus to first newly-loaded item's focusable target
         if (added > 0) {
           const firstNewItem = currentItems[oldCount];
           if (firstNewItem) {
-            // Make it programmatically focusable
-            firstNewItem.setAttribute("tabindex", "-1");
-            // Add a class so we can style the focus ring
-            firstNewItem.classList.add("a11y-focus-target");
-            // Move focus
-            firstNewItem.focus({ preventScroll: false });
-            if (A11Y_DEBUG)
-              console.log("🟦 Focus moved to first new item:", firstNewItem);
+            // Use focusTarget selector if provided, otherwise fall back to the item itself
+            const focusEl = focusTarget
+              ? firstNewItem.querySelector(focusTarget)
+              : firstNewItem;
+
+            if (focusEl) {
+              // Add tabindex=-1 only if the element isn't already focusable
+              if (
+                !focusEl.matches(
+                  "a, button, input, select, textarea, [tabindex]",
+                )
+              ) {
+                focusEl.setAttribute("tabindex", "-1");
+              }
+              focusEl.classList.add("a11y-focus-target");
+              focusEl.focus({ preventScroll: false });
+              a11yLog("🟦 Focus moved to:", focusEl);
+            }
           }
         }
 
@@ -83,34 +103,41 @@ window.a11yAnnounce = (function () {
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    a11yLog("🟦 DOMContentLoaded — running list observers");
+
     const lists = [
       {
         listSelector: ".faq_component",
         itemSelector: ".faq_accordion",
         label: "FAQs",
+        focusTarget: ".faq_question", // The clickable question element
       },
       {
         listSelector: ".case-studies-other_list",
         itemSelector: ".articles_item",
         label: "Blog articles",
+        focusTarget: "a", // First link in article card
       },
       {
         listSelector: ".research_list",
         itemSelector: ".research_item",
         label: "Research articles",
+        focusTarget: ".research_title-link", // Title link
       },
       {
         listSelector: ".conditions_list",
         itemSelector: ".w-dyn-item",
         label: "conditions",
+        focusTarget: "a", // First link in condition card
       },
       {
         listSelector: ".media_list",
         itemSelector: ".media_item",
         label: "Media",
+        focusTarget: "a", // First link in media item
       },
     ];
-    if (A11Y_DEBUG) console.log(`🟦 Configured lists: ${lists.length}`);
+    a11yLog(`🟦 Configured lists: ${lists.length}`);
     lists.forEach(observeListChanges);
   });
 })();
