@@ -1,4 +1,6 @@
 // A11y: shared announcement utility for screen reader announcements
+const A11Y_DEBUG = false; // flip to true for diagnostic logs
+
 window.a11yAnnounce = (function () {
   let region = null;
 
@@ -10,7 +12,7 @@ window.a11yAnnounce = (function () {
     region.setAttribute("aria-live", "polite");
     region.setAttribute("aria-atomic", "true");
     document.body.appendChild(region);
-    console.log("🟦 a11yAnnounce: live region created");
+    if (A11Y_DEBUG) console.log("🟦 a11yAnnounce: live region created");
     return region;
   }
 
@@ -19,57 +21,68 @@ window.a11yAnnounce = (function () {
     el.textContent = "";
     setTimeout(() => {
       el.textContent = message;
-      console.log("🟢 a11yAnnounce:", message);
+      if (A11Y_DEBUG) console.log("🟢 a11yAnnounce:", message);
     }, 50);
   };
 })();
 
-// A11y: CMS list change observer
+// A11y: CMS list change observer — announces + focuses new items
 (function () {
-  console.log("🟦 List observer script: loaded");
+  if (A11Y_DEBUG) console.log("🟦 List observer script: loaded");
 
   function observeListChanges(config) {
     const { listSelector, itemSelector, label } = config;
     const list = document.querySelector(listSelector);
 
-    if (!list) {
-      console.log(`🟦 List not found on this page: ${listSelector}`);
-      return;
-    }
+    if (!list) return;
 
-    let lastAnnouncedCount = list.querySelectorAll(itemSelector).length;
+    let lastItems = Array.from(list.querySelectorAll(itemSelector));
     let debounceTimer = null;
-    console.log(
-      `🟦 Observer attached: ${listSelector} (initial count: ${lastAnnouncedCount}, label: "${label}")`,
-    );
+    if (A11Y_DEBUG)
+      console.log(
+        `🟦 Observer attached: ${listSelector} (initial count: ${lastItems.length}, label: "${label}")`,
+      );
 
     new MutationObserver(() => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        const newCount = list.querySelectorAll(itemSelector).length;
-        if (newCount !== lastAnnouncedCount) {
-          const added = newCount - lastAnnouncedCount;
-          const message =
-            added > 0
-              ? `Loaded ${added} more items. Now showing ${newCount} ${label}.`
-              : `Now showing ${newCount} ${label}.`;
-          console.log(
-            `🟦 Count changed for ${listSelector}: ${lastAnnouncedCount} → ${newCount}`,
-          );
-          if (window.a11yAnnounce) {
-            window.a11yAnnounce(message);
-          } else {
-            console.warn("🟦 a11yAnnounce not available!");
+        const currentItems = Array.from(list.querySelectorAll(itemSelector));
+        const newCount = currentItems.length;
+        const oldCount = lastItems.length;
+
+        if (newCount === oldCount) return;
+
+        const added = newCount - oldCount;
+        const message =
+          added > 0
+            ? `Loaded ${added} more items. Now showing ${newCount} ${label}.`
+            : `Now showing ${newCount} ${label}.`;
+
+        if (A11Y_DEBUG)
+          console.log(`🟦 Count changed: ${oldCount} → ${newCount}`);
+        if (window.a11yAnnounce) window.a11yAnnounce(message);
+
+        // Focus management: if items were added, move focus to the first new item
+        if (added > 0) {
+          const firstNewItem = currentItems[oldCount];
+          if (firstNewItem) {
+            // Make it programmatically focusable
+            firstNewItem.setAttribute("tabindex", "-1");
+            // Add a class so we can style the focus ring
+            firstNewItem.classList.add("a11y-focus-target");
+            // Move focus
+            firstNewItem.focus({ preventScroll: false });
+            if (A11Y_DEBUG)
+              console.log("🟦 Focus moved to first new item:", firstNewItem);
           }
-          lastAnnouncedCount = newCount;
         }
+
+        lastItems = currentItems;
       }, 500);
     }).observe(list, { childList: true, subtree: true });
   }
 
   document.addEventListener("DOMContentLoaded", () => {
-    console.log("🟦 DOMContentLoaded — running list observers");
-
     const lists = [
       {
         listSelector: ".faq_component",
@@ -97,7 +110,7 @@ window.a11yAnnounce = (function () {
         label: "Media",
       },
     ];
-    console.log(`🟦 Configured lists: ${lists.length}`);
+    if (A11Y_DEBUG) console.log(`🟦 Configured lists: ${lists.length}`);
     lists.forEach(observeListChanges);
   });
 })();
